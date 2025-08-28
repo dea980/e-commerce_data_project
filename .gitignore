@@ -1,0 +1,18 @@
+/data/raw/
+/deploy
+.env
+__pycache__/
+*.pyc
+.DS_Store
+olist-pipeline/configs/...
+/docker
+/e-commerce/# macOS
+.DS_Store
+# Python
+.pytest_cache/
+__pycache__/
+*.pyc
+# Environment
+.env
+# Binaries
+mc

@@ -1,0 +1,56 @@
+x-common-env: &common-env
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+  S3_BUCKET: ${S3_BUCKET}
+  S3_PREFIX: ${S3_PREFIX}
+  S3_ENDPOINT: ${S3_ENDPOINT}
+  SQL_DIR: /opt/airflow/sql
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+
+  airflow-init:
+    image: apache/airflow:2.9.3
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://kdea989:Kdea504605@postgres:5432/olist
+      AIRFLOW__CORE__FERNET_KEY: "8Hk9x0KWhFaMF3RzIjzDNUW-OW_V_CtnJ2OlYGfJGw4="
+    # ...
+
+  airflow-webserver:
+    image: apache/airflow:2.9.3
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://kdea989:Kdea504605@postgres:5432/olist
+      AIRFLOW__CORE__FERNET_KEY: "8Hk9x0KWhFaMF3RzIjzDNUW-OW_V_CtnJ2OlYGfJGw4="
+      <<: *common-env
+    command: bash -lc "exec airflow webserver"
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.3
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://kdea989:Kdea504605@postgres:5432/olist
+      AIRFLOW__CORE__FERNET_KEY: "8Hk9x0KWhFaMF3RzIjzDNUW-OW_V_CtnJ2OlYGfJGw4="
+      <<: *common-env
+
+  minio-setup:
+    image: minio/mc
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      mc config host add myminio http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY};
+      mc mb myminio/${S3_BUCKET} --ignore-existing;
+      mc cp --recursive /data/raw/ myminio/${S3_BUCKET}/;
+      exit 0;
+      "
