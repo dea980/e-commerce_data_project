@@ -2,7 +2,7 @@
 
 이 디렉토리는 Olist 데이터 파이프라인의 자동화된 테스트를 포함합니다.
 
-## 🎯 테스트 전략
+## 테스트 전략
 
 ### 1. 단위 테스트 (Unit Tests)
 - **대상**: DAG 유틸리티 함수들 (`_common.py`, `_alerts.py`)
@@ -19,7 +19,7 @@
 - **목적**: DAG 설정의 정확성과 순환 의존성 방지
 - **파일**: `test_dag_validation.py`
 
-## 🚀 테스트 실행 방법
+## 테스트 실행 방법
 
 ### 빠른 시작
 ```bash
@@ -51,7 +51,7 @@ pytest tests/test_data_quality.py::TestDataQualityHard -v
 pytest tests/test_common.py::TestReadSQL::test_read_sql_success -v
 ```
 
-## 📋 테스트 구성 요소
+## 테스트 구성 요소
 
 ### conftest.py
 - pytest 설정 및 공통 픽스처
@@ -74,7 +74,7 @@ pytest tests/test_common.py::TestReadSQL::test_read_sql_success -v
 - 순환 의존성 탐지
 - 배치 ID 치환 로직 테스트
 
-## 🔧 테스트 환경 설정
+## 테스트 환경 설정
 
 ### 필수 의존성
 ```bash
@@ -90,13 +90,13 @@ export AIRFLOW__CORE__DAGS_FOLDER="$(pwd)/dag"
 ### Docker 기반 테스트 (선택사항)
 PostgreSQL 테스트 컨테이너를 사용하여 실제 DB와 유사한 환경에서 테스트합니다.
 
-## 📊 커버리지 목표
+## 커버리지 목표
 
 - **단위 테스트**: 80% 이상
 - **통합 테스트**: 주요 데이터 변환 로직 100%
 - **DAG 테스트**: 모든 DAG 구조 검증
 
-## 🏗️ CI/CD 통합
+## CI/CD 통합
 
 ### GitHub Actions 예시
 ```yaml
@@ -117,7 +117,7 @@ jobs:
         ./tests/run_tests.sh
 ```
 
-## 📝 테스트 작성 가이드
+## 테스트 작성 가이드
 
 ### 새로운 테스트 추가 시
 1. **파일명**: `test_*.py` 형식
@@ -138,7 +138,7 @@ def test_function_name(self, fixture_name):
     assert result == expected_output
 ```
 
-## 🔍 트러블슈팅
+## 트러블슈팅
 
 ### 일반적인 문제들
 1. **ImportError**: `PYTHONPATH` 설정 확인
@@ -150,7 +150,7 @@ def test_function_name(self, fixture_name):
 pytest tests/ -v --tb=long --log-cli-level=DEBUG
 ```
 
-## 📈 향후 개선 계획
+## 향후 개선 계획
 
 1. **성능 테스트**: 대용량 데이터 처리 성능 검증
 2. **End-to-End 테스트**: 실제 S3/MinIO와 연동 테스트
