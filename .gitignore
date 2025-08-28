@@ -1,18 +1,26 @@
-/data/raw/
-/deploy
-.env
-__pycache__/
-*.pyc
+# macOS
 .DS_Store
-olist-pipeline/configs/...
-/docker
-/e-commerce/# macOS
-.DS_Store
+
 # Python
 .pytest_cache/
 __pycache__/
 *.pyc
-# Environment
+
+# Environment Variables (민감한 정보 포함)
 .env
+.env.*
+*.env
+
 # Binaries
 mc
+
+# Data directories
+/data/raw/
+/deploy
+/docker
+
+# Virtual Environment
+/e-commerce/
+
+# Configs with sensitive data
+/olist-pipeline/configs/
