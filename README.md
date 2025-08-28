@@ -1,215 +1,130 @@
-# Olist E-Commerce ETL Pipeline
+# Olist E-Commerce Data Pipeline
 
-## Overview
+Brazilian e-commerce 데이터를 처리하는 ETL 파이프라인입니다. Airflow로 오케스트레이션하고 PostgreSQL에 저장하는 구조로 되어있어요.
 
-This repository implements a scalable, containerized ETL (Extract, Transform, Load) pipeline for the Brazilian E-commerce Public Dataset by Olist. The architecture leverages industry-standard data engineering tools:
+## Quick Start
 
-- **Apache Airflow 2.9.3**: Orchestration engine for workflow scheduling and dependency management
-- **PostgreSQL 15**: RDBMS for structured data storage with transactional integrity
-- **MinIO**: S3-compatible object storage for raw data persistence
-
-The pipeline follows a medallion architecture pattern with progressive data refinement through multiple processing layers.
-
-## Data Source
-
-The pipeline processes the Olist Brazilian E-commerce dataset comprising 9 normalized CSV files with the following specifications:
-
-| Entity | Records | Key Attributes |
-|--------|---------|----------------|
-| Orders | 99,441 | order_id, customer_id, status, timestamps |
-| Order Items | 112,650 | order_id, product_id, seller_id, price |
-| Customers | 99,441 | customer_id, location data |
-| Sellers | 3,095 | seller_id, location data |
-| Products | 32,951 | product_id, category, dimensions |
-| Reviews | 104,719 | review_id, order_id, score, comments |
-| Payments | 103,886 | order_id, payment_type, installments |
-| Geolocation | 1,000,163 | zip_code_prefix, lat/lng coordinates |
-| Category Translation | 71 | Portuguese to English mappings |
-
-## Pipeline Architecture
-
-The data pipeline implements a three-layer medallion architecture:
-
-### 1. Raw Layer (Bronze)
-**DAG: olist_raw_load**
-- Ingests data from MinIO S3 to PostgreSQL raw tables
-- Preserves source data integrity with minimal transformations
-- Implements metadata tracking (batch_id, ingestion timestamp, source)
-- Executes lightweight data validation checks
-- Technical implementation:
-  ```python
-  # Key operations in raw layer
-  batch_id = str(uuid.uuid4())  # Unique processing ID
-  s3 = _s3()  # S3/MinIO client initialization
-  
-  # Stream data directly from object storage to PostgreSQL
-  for tbl, key in RAW_FILES.items():
-      obj = s3.get_object(Bucket=S3_BUCKET, Key=s3key)
-      with io.TextIOWrapper(obj["Body"], encoding="utf-8") as f:
-          cur.copy_expert(f"COPY raw.{tbl} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
-  ```
-
-### 2. ODS Layer (Silver)
-**DAG: raw_to_ods**
-- Applies schema enforcement and data type standardization
-- Executes data quality checks (hard constraints and soft validations)
-- Implements error handling with configurable failure thresholds
-- Integrates with alerting system for DQ violations
-- Technical implementation:
-  ```sql
-  -- Example of ODS layer transformation (simplified)
-  INSERT INTO ods.orders
-  SELECT
-    order_id,
-    customer_id,
-    CASE
-      WHEN order_status IN ('delivered', 'shipped', 'canceled') THEN order_status
-      ELSE 'other'
-    END AS order_status,
-    CAST(order_purchase_timestamp AS TIMESTAMP),
-    -- Additional transformations
-  FROM raw.orders_raw
-  WHERE _batch_id = '{{BATCH_ID}}'
-  ON CONFLICT (order_id) DO UPDATE
-  SET /* update logic */;
-  ```
-
-### 3. Dimensional Layer (Gold)
-**DAG: ods_dim**
-- Implements dimensional modeling (fact/dimension tables)
-- Optimizes for analytical query performance
-- Applies appropriate indexing strategies
-- Handles SCD (Slowly Changing Dimension) patterns
-- Technical implementation:
-  ```sql
-  -- Example of dimension table creation
-  CREATE TABLE IF NOT EXISTS dim.d_customer (
-    customer_key SERIAL PRIMARY KEY,
-    customer_id VARCHAR(50) NOT NULL,
-    customer_city VARCHAR(50),
-    customer_state CHAR(2),
-    geolocation_lat NUMERIC(15,10),
-    geolocation_lng NUMERIC(15,10),
-    valid_from TIMESTAMP NOT NULL,
-    valid_to TIMESTAMP,
-    is_current BOOLEAN DEFAULT TRUE,
-    UNIQUE(customer_id, valid_from)
-  );
-  ```
-
-## Technical Requirements
-
-- Docker Engine 20.10+ and Docker Compose v2+
-- Minimum 4GB RAM allocated to Docker
-- Available ports: 8080 (Airflow), 9000-9001 (MinIO)
-- 5GB+ available disk space
-
-## Deployment
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd e-commerce_data_project
-   ```
-
-2. Deploy the containerized infrastructure:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. Verify deployment status:
-   ```bash
-   docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-   ```
-
-## Service Access
-
-| Service | URL | Credentials | Purpose |
-|---------|-----|-------------|---------|
-| Airflow | http://localhost:8080 | kdea989/Kdea504605 | Workflow orchestration |
-| MinIO Console | http://localhost:9001 | kdea989/Kdea504605 | Object storage management |
-
-## Repository Structure
-
-```
-e-commerce_data_project/
-├── data/
-│   └── raw/                  # Source CSV files
-├── olist-pipeline/
-│   ├── dag/                  # Airflow DAG definitions
-│   │   ├── _alerts.py        # Alerting framework
-│   │   ├── _common.py        # Shared utilities
-│   │   ├── olist_raw_load.py # Raw ingestion DAG
-│   │   ├── raw_to_ods.py     # ODS transformation DAG
-│   │   └── ods_dim.py        # Dimensional modeling DAG
-│   ├── docker/               # Docker configuration
-│   └── sql/                  # SQL transformation scripts
-│       ├── 00_raw_ddl.sql    # Raw schema definitions
-│       ├── 01_raw_meta.sql   # Metadata column definitions
-│       ├── 02_raw_indexes.sql # Raw layer indexing
-│       ├── 03_dq_hard.sql    # Critical data quality checks
-│       ├── 04_dq_soft.sql    # Non-critical data quality checks
-│       ├── 10_ods_core_ddl.sql # ODS schema definitions
-│       ├── 11_ods_core_indexes.sql # ODS performance optimization
-│       ├── 12_ods_core_upsert.sql # ODS incremental loading
-│       └── 20_ods_dim_ddl.sql # Dimensional model definitions
-└── docker-compose.yml        # Infrastructure as code
-```
-
-## Execution
-
-The pipeline implements event-driven orchestration with DAG dependencies:
-
-1. Access Airflow UI: http://localhost:8080
-2. Authenticate with provided credentials
-3. Navigate to DAGs view
-4. Activate DAGs (toggle switch if paused)
-5. Trigger `olist_raw_load` DAG
-   - Subsequent DAGs (`raw_to_ods` → `ods_dim`) will be automatically triggered via TriggerDagRunOperator
-
-## Monitoring and Troubleshooting
-
-### Logs
 ```bash
-# View container logs
-docker logs e-commerce_data_project-airflow-webserver-1 -f
+# 1. 클론
+git clone <repo-url>
+cd e-commerce_data_project
 
-# View Airflow task logs via UI
-# DAGs > [DAG_NAME] > [TASK_NAME] > Log
+# 2. 환경변수 설정
+cp olist-pipeline/docker/.env.local .env
+# .env 파일에서 DB 비밀번호 등 수정
+
+# 3. 실행
+cd olist-pipeline/docker
+docker-compose -f docker-compose.improved.yml up -d
+
+# 4. 확인
+# Airflow: http://localhost:8080 (admin/admin)
+# MinIO: http://localhost:9001 (minioadmin/minioadmin)
 ```
 
-### Common Issues
+## 데이터 소스
 
-#### Port Conflicts
-Modify port mappings in `docker-compose.yml` if conflicts occur:
-```yaml
-ports:
-  - "8081:8080"  # Map to alternate host port
+Olist에서 제공하는 9개 CSV 파일을 사용합니다:
+
+- **orders**: 주문 정보 (99,441건)
+- **order_items**: 주문 상품 (112,650건) 
+- **customers**: 고객 정보 (99,441건)
+- **sellers**: 판매자 정보 (3,095건)
+- **products**: 상품 정보 (32,951건)
+- **reviews**: 리뷰 (104,719건)
+- **payments**: 결제 정보 (103,886건)
+- **geolocation**: 지역 정보 (1,000,163건)
+- **product_category_translation**: 카테고리 번역 (71건)
+
+## 아키텍처
+
+3단계로 데이터를 처리합니다:
+
+### 1. Raw Layer
+- CSV 파일을 그대로 PostgreSQL에 로드
+- 모든 컬럼을 TEXT로 저장 (스키마 변경 대응)
+- 배치 ID, 수집 시간 등 메타데이터 추가
+
+### 2. ODS Layer  
+- 데이터 타입 변환 (TEXT → 적절한 타입)
+- 기본적인 데이터 품질 체크
+- 중복 제거, NULL 처리
+
+### 3. Dimensional Layer
+- 분석용 차원 테이블 생성
+- 팩트 테이블과 차원 테이블 분리
+- 인덱스 최적화
+
+## DAG 구조
+
+```
+olist_raw_load → raw_to_ods → ods_dim
 ```
 
-#### Container Health
+각 DAG는 이전 DAG 완료 후 자동으로 실행됩니다.
+
+## 주요 파일들
+
+```
+olist-pipeline/
+├── dag/                    # Airflow DAG들
+│   ├── olist_raw_load.py   # CSV → Raw
+│   ├── raw_to_ods.py       # Raw → ODS  
+│   └── ods_dim.py          # ODS → Dimensional
+├── sql/                    # SQL 스크립트들
+│   ├── 00_raw_ddl.sql      # Raw 테이블 생성
+│   ├── 10_ods_core_ddl.sql # ODS 테이블 생성
+│   └── 20_ods_dim_ddl.sql  # 차원 테이블 생성
+└── docker/                 # Docker 설정
+    └── docker-compose.improved.yml
+```
+
+## 문제 해결
+
+### 포트 충돌
 ```bash
-# Check container health
-docker ps --format "table {{.Names}}\t{{.Status}}"
-
-# Restart specific container
-docker restart e-commerce_data_project-airflow-webserver-1
+# 8080 포트가 사용 중인 경우
+lsof -ti:8080 | xargs kill -9
 ```
 
-#### Data Quality Alerts
-Data quality issues are logged to:
-1. Airflow task logs
-2. Slack notifications (if configured)
+### 컨테이너 재시작
+```bash
+docker-compose -f docker-compose.improved.yml restart
+```
 
-## License and Attribution
+### 로그 확인
+```bash
+# Airflow 로그
+docker logs e-commerce_data_project-airflow-webserver-1
 
-This project utilizes the Brazilian E-commerce Public Dataset by Olist, available under [Kaggle's terms](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce). Commercial usage requires appropriate attribution.
+# PostgreSQL 로그  
+docker logs e-commerce_data_project-postgres-1
+```
 
-## Contributors
+### 데이터 품질 이슈
+- Airflow UI에서 DAG 로그 확인
+- `quarantine.bad_rows` 테이블에서 실패한 데이터 확인
 
-- Data Engineering Team
+## 개발 환경
 
-## Acknowledgements
+- Python 3.12
+- Apache Airflow 2.9.3
+- PostgreSQL 15
+- MinIO (S3 호환)
 
-- Olist for dataset publication
-- Apache Airflow, PostgreSQL, and MinIO open-source communities
+## 테스트
+
+```bash
+cd olist-pipeline/tests
+./run_tests.sh
+```
+
+## 주의사항
+
+- `.env` 파일에 민감한 정보가 있으니 `.gitignore`에 추가되어 있는지 확인
+- 프로덕션에서는 기본 비밀번호 변경 필수
+- 대용량 데이터 처리 시 메모리 모니터링 필요
+
+## 라이센스
+
+Olist Brazilian E-commerce Dataset을 사용합니다. 상업적 사용 시 적절한 출처 표시가 필요합니다.
