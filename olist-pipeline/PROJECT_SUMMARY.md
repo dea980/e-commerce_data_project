@@ -16,6 +16,7 @@ Olist e-commerce 데이터를 처리하는 ETL 파이프라인입니다.
 CSV → Raw → ODS → DIM → GOLD
 ```
 
+
 - **Raw**: CSV 파일을 그대로 로드
 - **ODS**: 데이터 타입 변환 + 품질 체크
 - **DIM**: 차원 테이블 생성
