@@ -11,7 +11,7 @@ import psycopg2
 
 from airflow.operators.python import PythonOperator
 
-SQL_BASE_DIR = os.environ.get("SQL_BASE_DIR", "/opt/airflow/include/sql")
+SQL_BASE_DIR = os.environ.get("SQL_BASE_DIR", "/opt/airflow/sql")
 
 def _run_sql(pg_conn_uri: str, sql_text: str, params: dict = None):
     with psycopg2.connect(pg_conn_uri) as conn:
@@ -25,10 +25,14 @@ def run_sql_file(pg_conn_uri: str, rel_path: str, params: dict = None):
     _run_sql(pg_conn_uri, sql, params)
 
 def sql_task(dag, task_id: str, rel_path: str, extra_params: dict = None):
-    # Airflow env-style conn string (e.g., postgresql+psycopg2://... 는 psycopg2 URI로 맞춰주세요)
+    # Airflow env-style conn string을 psycopg2 URI로 변환
     pg_uri = os.environ.get("AIRFLOW_CONN_POSTGRES_DEFAULT")
     if not pg_uri:
         raise RuntimeError("AIRFLOW_CONN_POSTGRES_DEFAULT is not set.")
+    
+    # postgresql+psycopg2:// -> postgresql:// 변환
+    if pg_uri.startswith("postgresql+psycopg2://"):
+        pg_uri = pg_uri.replace("postgresql+psycopg2://", "postgresql://")
 
     def _runner(ds, **_):
         params = {"ds": ds}
