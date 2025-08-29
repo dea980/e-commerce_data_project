@@ -106,6 +106,7 @@ SELECT * FROM ops.dq_results ORDER BY checked_at DESC LIMIT 10;
 SELECT * FROM ops.dq_results WHERE status = 'fail' ORDER BY checked_at DESC;
 ```
 
+
 ## 종료
 
 ```bash
